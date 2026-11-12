@@ -51,7 +51,7 @@ export const modelConfigMap = {
   doubao:   { label: '豆包（火山方舟）', baseURL: 'https://ark.cn-beijing.volces.com/api/v1', envKey: 'DOUBAO_API_KEY',    model: 'ep-xxxxxxxxxxxx' },
   deepseek: { label: 'DeepSeek',        baseURL: 'https://api.deepseek.com/v1',          envKey: 'DEEPSEEK_API_KEY',  model: 'deepseek-chat' },
   qwen:     { label: '通义千问',        baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', envKey: 'DASHSCOPE_API_KEY', model: 'qwen-plus' },
-  kimi:     { label: 'Kimi（月之暗面）', baseURL: 'https://api.moonshot.cn/v1',          envKey: 'MOONSHOT_API_KEY',  model: 'moonshot-v1-8k' },
+  kimi:     { label: 'Kimi（月之暗面）', baseURL: 'https://api.moonshot.cn/v1',          envKey: 'MOONSHOT_API_KEY',  model: 'kimi-k3' },
 };
 ```
 
