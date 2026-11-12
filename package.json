@@ -1,0 +1,14 @@
+{
+  "name": "stage2-name-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "阶段2：多模型切换 AI 起名，modelConfigMap 配置表，SSE 流式，Supabase 存历史",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}

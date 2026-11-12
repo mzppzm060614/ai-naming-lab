@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 起名 · 阶段2 多模型</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f766e'/%3E%3Ctext x='12' y='17' font-size='13' text-anchor='middle' fill='white' font-family='sans-serif'%3E名%3C/text%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --card: #ffffff;
+      --ink: #1f2933;
+      --muted: #6b7280;
+      --line: #e5e1d8;
+      --accent: #0f766e;
+      --accent-soft: #e6f2f0;
+      --danger: #b42318;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
+    header h1 { font-size: 22px; margin: 0 0 4px; }
+    header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    @media (min-width: 768px) {
+      .grid { grid-template-columns: 3fr 2fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .card h2 { font-size: 15px; margin: 0 0 12px; }
+
+    label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--muted); }
+    textarea, select {
+      width: 100%;
+      font-size: 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-family: inherit;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    .field { margin-bottom: 14px; }
+
+    button.primary {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 1.2em; }
+    .status.error { color: var(--danger); }
+
+    .output {
+      margin-top: 14px;
+      min-height: 160px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 15px;
+      background: var(--accent-soft);
+      border: 1px dashed #b9d8d3;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .output.empty { color: var(--muted); }
+
+    .history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .history-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    .history-item .meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .history-item .prompt { font-size: 13px; margin-bottom: 6px; }
+    .history-item .result { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+    .empty-tip { color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>AI 起名 · 阶段2 多模型</h1>
+      <p>modelConfigMap 配置表 · 一套代码切换 4 个模型 · SSE 流式 · Supabase 历史</p>
+    </header>
+
+    <div class="grid">
+      <div>
+        <section class="card">
+          <h2>起名需求</h2>
+          <div class="field">
+            <label for="prompt">例如：男孩、国风、简约</label>
+            <textarea id="prompt" placeholder="例如：姓李，男孩，希望名字沉稳大气，偏国风简约"></textarea>
+          </div>
+          <div class="field">
+            <label for="model">选择模型</label>
+            <select id="model"></select>
+          </div>
+          <button class="primary" id="generate">生成名字方案</button>
+          <div class="status" id="status">等待生成</div>
+        </section>
+
+        <section class="card">
+          <h2>生成结果（流式）</h2>
+          <div class="output empty" id="output">结果会在这里一点点显示出来…</div>
+        </section>
+      </div>
+
+      <aside class="card">
+        <h2>起名历史</h2>
+        <ul class="history-list" id="historyList">
+          <li class="empty-tip">暂无记录</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const promptEl = document.getElementById('prompt');
+    const modelEl = document.getElementById('model');
+    const btn = document.getElementById('generate');
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
+    const historyList = document.getElementById('historyList');
+
+    let modelKey = '';
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle('error', !!isError);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    async function loadHistory() {
+      try {
+        const resp = await fetch('/api/name');
+        const data = await resp.json();
+        renderHistory(data.rows || []);
+
+        // 用接口返回的公开模型列表填充下拉框
+        modelEl.innerHTML = '';
+        (data.models || []).forEach((m) => {
+          const opt = document.createElement('option');
+          opt.value = m.key;
+          opt.textContent = `${m.label}（${m.model}）`;
+          modelEl.appendChild(opt);
+        });
+        modelKey = modelEl.value;
+      } catch (e) {
+        historyList.innerHTML = '<li class="empty-tip">历史加载失败</li>';
+      }
+    }
+
+    modelEl.addEventListener('change', () => {
+      modelKey = modelEl.value;
+    });
+
+    function renderHistory(rows) {
+      if (!rows.length) {
+        historyList.innerHTML = '<li class="empty-tip">暂无记录</li>';
+        return;
+      }
+      historyList.innerHTML = rows.map((r) => {
+        const time = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN') : '';
+        return `<li class="history-item">
+          <div class="meta">${escapeHtml(r.model_name)} · ${escapeHtml(time)}</div>
+          <div class="prompt">需求：${escapeHtml(r.user_requirement)}</div>
+          <div class="result">${escapeHtml(r.name_result)}</div>
+        </li>`;
+      }).join('');
+    }
+
+    async function streamNaming(prompt, key) {
+      outputEl.textContent = '';
+      outputEl.classList.remove('empty');
+      let full = '';
+      let buffer = '';
+
+      const resp = await fetch('/api/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, modelKey: key }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '请求失败' }));
+        throw new Error(err.error || ('状态码 ' + resp.status));
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          const line = part.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          const payload = line.slice(5).trim();
+          if (!payload || payload === '[DONE]') continue;
+          try {
+            const json = JSON.parse(payload);
+            const delta = json.choices && json.choices[0] && json.choices[0].delta
+              ? json.choices[0].delta.content || ''
+              : '';
+            if (delta) {
+              full += delta;
+              outputEl.textContent += delta;
+            }
+          } catch (_) {
+            // 跳过解析不了的心跳/注释行
+          }
+        }
+      }
+      return full;
+    }
+
+    async function saveHistory(prompt, result, key) {
+      try {
+        await fetch('/api/name', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'history', prompt, result, modelKey: key }),
+        });
+        loadHistory();
+      } catch (e) {
+        setStatus('历史保存失败：' + e.message, true);
+      }
+    }
+
+    btn.addEventListener('click', async () => {
+      const prompt = promptEl.value.trim();
+      if (!prompt) {
+        setStatus('请先填写起名需求', true);
+        return;
+      }
+      modelKey = modelEl.value;
+      btn.disabled = true;
+      setStatus('流式生成中…');
+
+      try {
+        const result = await streamNaming(prompt, modelKey);
+        if (!result.trim()) {
+          setStatus('模型没有返回内容，请检查对应密钥和接入点 ID 后重试', true);
+        } else {
+          setStatus('生成完成，正在保存历史…');
+          await saveHistory(prompt, result, modelKey);
+          setStatus('生成完成，已保存到历史');
+        }
+      } catch (e) {
+        setStatus('生成失败：' + e.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    loadHistory();
+  </script>
+</body>
+</html>
