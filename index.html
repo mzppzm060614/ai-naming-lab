@@ -172,6 +172,10 @@
           opt.textContent = `${m.label}（${m.model}）`;
           modelEl.appendChild(opt);
         });
+        // 默认选中已可用的 Kimi；豆包/DeepSeek/千问需在对应平台开通或充值后再切换
+        if ([...modelEl.options].some((o) => o.value === 'kimi')) {
+          modelEl.value = 'kimi';
+        }
         modelKey = modelEl.value;
       } catch (e) {
         historyList.innerHTML = '<li class="empty-tip">历史加载失败</li>';

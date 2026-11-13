@@ -145,7 +145,7 @@ async function handleStream(req, res, body) {
       body: JSON.stringify({
         model: cfg.model,
         stream: true,
-        temperature: 0.8,
+        temperature: cfg.temperature ?? 0.8,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: String(prompt).trim() },
